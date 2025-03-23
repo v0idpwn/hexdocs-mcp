@@ -1,12 +1,12 @@
-import {
-  McpServer,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import axios from "axios";
 import { z } from "zod";
-import { SearchResponse, DocumentSchema } from "typesense/lib/Typesense/Documents.js";
+import {
+  SearchResponse,
+  DocumentSchema,
+} from "typesense/lib/Typesense/Documents.js";
 
-// Define the document structure for Hexdocs search results
 interface HexdocsDocument extends DocumentSchema {
   title: string;
   package: string;
@@ -15,7 +15,6 @@ interface HexdocsDocument extends DocumentSchema {
   doc?: string;
 }
 
-// Create an MCP server
 const server = new McpServer({
   name: "Hexdocs search",
   version: "1.0.0",
@@ -49,7 +48,10 @@ async function getPackagesLatestVsn(packages: string[]): Promise<string[]> {
   return results.filter((result): result is string => result !== null);
 }
 
-async function searchRequest(query: string, packages: string[]): Promise<SearchResponse<HexdocsDocument> | null> {
+async function searchRequest(
+  query: string,
+  packages: string[],
+): Promise<SearchResponse<HexdocsDocument> | null> {
   try {
     const packagesWithVsn = (await getPackagesLatestVsn(packages)).join("&");
     const response = await axios.get(
@@ -61,11 +63,13 @@ async function searchRequest(query: string, packages: string[]): Promise<SearchR
   }
 }
 
-function resultsAsString(results: SearchResponse<HexdocsDocument> | null): string {
+function resultsAsString(
+  results: SearchResponse<HexdocsDocument> | null,
+): string {
   if (!results) {
     return "Error: Failed to retrieve search results.";
   }
-  
+
   let output = `Found ${results.found || 0} results for "${results.request_params?.q || "unknown query"}"\n\n`;
 
   if (!results.hits || results.hits.length === 0) {
