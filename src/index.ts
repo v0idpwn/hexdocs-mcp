@@ -1,12 +1,19 @@
 import {
   McpServer,
-  ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import Typesense from "typesense";
 import axios from "axios";
 import { z } from "zod";
-import { SearchResponse } from "typesense/lib/Typesense/Documents.js";
+import { SearchResponse, DocumentSchema } from "typesense/lib/Typesense/Documents.js";
+
+// Define the document structure for Hexdocs search results
+interface HexdocsDocument extends DocumentSchema {
+  title: string;
+  package: string;
+  ref: string;
+  type: string;
+  doc?: string;
+}
 
 // Create an MCP server
 const server = new McpServer({
@@ -14,8 +21,8 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-const hexdocs_search_url = "https://search.hexdocs.pm";
-const hex_packages_url = "https://hex.pm/api/packages/";
+const HEXDOCS_SEARCH_URL = "https://search.hexdocs.pm";
+const HEX_PACKAGES_URL = "https://hex.pm/api/packages/";
 
 // Queries hex.pm API to fetch latest packages version
 //
@@ -23,8 +30,8 @@ const hex_packages_url = "https://hex.pm/api/packages/";
 async function getPackagesLatestVsn(packages: string[]): Promise<string[]> {
   const fetchPromises = packages.map(async (packageName) => {
     try {
-      const response = await axios.get(`${hex_packages_url}/${packageName}`);
-      const version = response.data && response.data.releases[0].version;
+      const response = await axios.get(`${HEX_PACKAGES_URL}/${packageName}`);
+      const version = response.data?.releases[0]?.version;
 
       if (version) {
         return `${packageName}-${version}`;
@@ -32,7 +39,7 @@ async function getPackagesLatestVsn(packages: string[]): Promise<string[]> {
         return null;
       }
     } catch (error) {
-      // :)
+      // Silent fail for package not found
       return null;
     }
   });
@@ -42,11 +49,11 @@ async function getPackagesLatestVsn(packages: string[]): Promise<string[]> {
   return results.filter((result): result is string => result !== null);
 }
 
-async function searchRequest(query: string, packages: Array<string>) {
+async function searchRequest(query: string, packages: string[]): Promise<SearchResponse<HexdocsDocument> | null> {
   try {
-    let packagesWithVsn = (await getPackagesLatestVsn(packages)).join("&");
+    const packagesWithVsn = (await getPackagesLatestVsn(packages)).join("&");
     const response = await axios.get(
-      `${hexdocs_search_url}?q=${encodeURIComponent(query)}&query_by=doc,title&filter_by=package:=${encodeURIComponent(packagesWithVsn)}"`,
+      `${HEXDOCS_SEARCH_URL}?q=${encodeURIComponent(query)}&query_by=doc,title&filter_by=package:=${encodeURIComponent(packagesWithVsn)}"`,
     );
     return response.data;
   } catch (error) {
@@ -54,7 +61,11 @@ async function searchRequest(query: string, packages: Array<string>) {
   }
 }
 
-function resultsAsString(results: SearchResponse<any>): string {
+function resultsAsString(results: SearchResponse<HexdocsDocument> | null): string {
+  if (!results) {
+    return "Error: Failed to retrieve search results.";
+  }
+  
   let output = `Found ${results.found || 0} results for "${results.request_params?.q || "unknown query"}"\n\n`;
 
   if (!results.hits || results.hits.length === 0) {
@@ -84,7 +95,7 @@ server.tool(
   "Searches documentation from any existing elixir package. Expects a list of packages to search on, and a term to search for.",
   { packages: z.array(z.string()), query: z.string() },
   async ({ packages, query }) => {
-    let searchResults = await searchRequest(query, packages);
+    const searchResults = await searchRequest(query, packages);
 
     return {
       content: [{ type: "text", text: resultsAsString(searchResults) }],
