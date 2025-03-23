@@ -46,7 +46,7 @@ async function searchRequest(query: string, packages: Array<string>) {
   try {
     let packagesWithVsn = (await getPackagesLatestVsn(packages)).join("&");
     const response = await axios.get(
-      `${hexdocs_search_url}?q=${encodeURIComponent(query)}&query_by=doc,title&filter_by=package:=${encodeURIComponent(packagesWithVsn)}"&filter_by=type:=function&module`,
+      `${hexdocs_search_url}?q=${encodeURIComponent(query)}&query_by=doc,title&filter_by=package:=${encodeURIComponent(packagesWithVsn)}"`,
     );
     return response.data;
   } catch (error) {
